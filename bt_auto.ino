@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
 #include "utility/Adafruit_MS_PWMServoDriver.h"
+#include <TimerOne.h>
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
 Adafruit_DCMotor *myMotor1 = AFMS.getMotor(1);
@@ -33,7 +34,8 @@ struct s_control_msg {
 s_control_msg msg;
 uint8_t msg_field;
 
-bool este;
+volatile bool sendDistance;
+
 
 void setup() {
   // Pins
@@ -60,17 +62,27 @@ void setup() {
   myMotor2->run(RELEASE);
   myMotor3->run(RELEASE);
   myMotor4->run(RELEASE);
+  
+  
+  Timer1.initialize(50000);
+  Timer1.attachInterrupt(requestDistanceTX); // blinkLED to run every 0.15 seconds
+}
+
+void requestDistanceTX() {
+ sendDistance = true; 
 }
 
 void loop() {
   if (digitalRead(6)==HIGH) {
     digitalWrite(13,HIGH);
     // Lähetä esteestä tieto
-    Serial.println(analogRead(DISTANCE_PIN));
-    if (analogRead(DISTANCE_PIN) < 50) {
+    if (sendDistance) {
+    if (analogRead(DISTANCE_PIN) < 20) {
       btSerial.write(200);
     } else {
       btSerial.write(201);
+    }
+    sendDistance = false;
     }
   } else {
     digitalWrite(13, LOW);

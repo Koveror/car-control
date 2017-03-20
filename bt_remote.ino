@@ -7,7 +7,7 @@
 #define BT_CD 6
 #define BT_CD_LED A5
 
-#define ESTE_LED A4
+#define ESTE_LED A2
 
 // Use softwareSerial for the bt communication
 #include <SoftwareSerial.h>
