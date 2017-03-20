@@ -1,13 +1,21 @@
 // BT-car, remote controller
+#include <Wire.h>
+#include <Adafruit_MotorShield.h>
+#include "utility/Adafruit_MS_PWMServoDriver.h"
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
+Adafruit_DCMotor *myMotor1 = AFMS.getMotor(1);
+Adafruit_DCMotor *myMotor2 = AFMS.getMotor(2);
+Adafruit_DCMotor *myMotor3 = AFMS.getMotor(3);
+Adafruit_DCMotor *myMotor4 = AFMS.getMotor(4);
 
 // Bluetooth module serial pins
 #define BT_RX 4
 #define BT_TX 5
 // Bluetooth carrier detect pin
 #define BT_CD 6
-#define BT_CD_LED A5
 
-#define ESTE_LED A4
+#define DISTANCE_PIN A0
 
 // Use softwareSerial for the bt communication
 #include <SoftwareSerial.h>
@@ -30,66 +38,44 @@ bool este;
 void setup() {
   // Pins
   pinMode(BT_CD, INPUT);
-  pinMode(BT_CD_LED, OUTPUT);   // Use the built-in led for BT-carrier detect light
+  pinMode(13, OUTPUT);   // Use the built-in led for BT-carrier detect light
   Serial.begin(115200);  // USB serial
   btSerial.begin(38400); // SoftwareSerial, needs to match module configuration
   // Higher speeds result in errors.
+                         
+  AFMS.begin();  // create with the default frequency 1.6KHz
+  //AFMS.begin(1000);  // OR with a different frequency, say 1KHz
   
-  pinMode(ESTE_LED, OUTPUT);
-  digitalWrite(ESTE_LED, LOW);
+  // Set the speed to start, from 0 (off) to 255 (max speed)
+  myMotor1->setSpeed(150);
+  myMotor2->setSpeed(150);
+  myMotor3->setSpeed(150);
+  myMotor4->setSpeed(150);
+  myMotor1->run(FORWARD);
+  myMotor2->run(FORWARD);
+  myMotor3->run(FORWARD);
+  myMotor4->run(FORWARD);
+  // turn on motor
+  myMotor1->run(RELEASE);
+  myMotor2->run(RELEASE);
+  myMotor3->run(RELEASE);
+  myMotor4->run(RELEASE);
 }
 
 void loop() {
-  // BT carrier detect
-  if (digitalRead(6) == HIGH) {
-    delay(10);
-    digitalWrite(BT_CD_LED, HIGH);
-    //Analog input from A0 and A1
-    int sensorValue0 = analogRead(A0);  //value of A0 from 0 to 1023 (left side motors)
-    int sensorValue1 = analogRead(A1);  //value of A1 from 0 to 1023 (right side motors)
-    int deadZoneStart = 501;            //deadzone around halfway
-    int deadZoneEnd = 521;
-    bool motor1_dir, motor2_dir;
-    uint8_t motor1_speed, motor2_speed;
-
-    //Check on which side of the deadzone the joystick is and control the motors accordingly
-    if(sensorValue0 > deadZoneEnd) {
-      uint8_t mappedValue0 = map(sensorValue0, deadZoneEnd, 1023, 0, 255); //map 521-1023 to 0-255
-      motor1_dir = false;
-      motor1_speed = mappedValue0;
-    } else if(sensorValue0 < deadZoneStart) {
-      uint8_t mappedValue0 = map(sensorValue0, 0, deadZoneStart, 255, 0); //map 0-501 to 0-255
-      motor1_dir = true;
-      motor1_speed = mappedValue0;
+  if (digitalRead(6)==HIGH) {
+    digitalWrite(13,HIGH);
+    // Lähetä esteestä tieto
+    Serial.println(analogRead(DISTANCE_PIN));
+    if (analogRead(DISTANCE_PIN) < 50) {
+      btSerial.write(200);
     } else {
-      motor1_dir=false;
-      motor1_speed=0;
-    }
-
-    if(sensorValue1 > deadZoneEnd) {
-      int mappedValue1 = map(sensorValue1, deadZoneEnd, 1023, 0, 255);
-      motor2_dir=false;
-      motor2_speed=mappedValue1;
-    } else if(sensorValue1 < deadZoneStart) {
-      int mappedValue1 = map(sensorValue1, 0, deadZoneStart, 255, 0);
-      motor2_dir=true;
-      motor2_speed=mappedValue1;
-    } else {
-      motor2_dir=true;
-      motor2_speed=0;
-    }
-    send_msg(motor1_dir,motor2_dir,motor1_speed,motor2_speed);
-    if (btSerial.available()) {
-      uint8_t in = btSerial.read();
-      if (in == 200) {
-        digitalWrite(ESTE_LED, HIGH);
-      } else if (in == 201) {
-        digitalWrite(ESTE_LED, LOW);
-      }
+      btSerial.write(201);
     }
   } else {
-    digitalWrite(BT_CD_LED, LOW);
+    digitalWrite(13, LOW);
   }
+  receive_msg();  
 }
 
 // Echo data from one serial to the other
@@ -146,6 +132,18 @@ void decode_msg() {
   
   left_speed = hexToDec(msg.left_motor);
   right_speed = hexToDec(msg.right_motor);
+  
+  myMotor1->run(left_direction);
+  myMotor3->run(left_direction);
+  myMotor1->setSpeed(left_speed);
+  myMotor3->setSpeed(left_speed);
+
+  myMotor2->run(right_direction);
+  myMotor4->run(right_direction);
+  myMotor2->setSpeed(right_speed);
+  myMotor4->setSpeed(right_speed);
+  
+  // Test code, replace with motor shield commands
 }
 
 
@@ -181,6 +179,9 @@ void send_msg(bool left_direction, bool right_direction, uint8_t left_speed, uin
     btSerial.write(((uint8_t*)&send_msg)[i]);
   }
   
+  // Test code
+  msg = send_msg;
+  decode_msg();
 }
 
 
