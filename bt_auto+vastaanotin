@@ -1,4 +1,4 @@
-// BT-car, remote controller
+// BT-car, remotecontroller and led control
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
 #include "utility/Adafruit_MS_PWMServoDriver.h"
@@ -22,6 +22,9 @@ Adafruit_DCMotor *myMotor4 = AFMS.getMotor(4);
 #include <SoftwareSerial.h>
 SoftwareSerial btSerial(BT_RX, BT_TX); // RX, TX
 
+int leftPinOut = 8;
+int rightPinOut = 9;
+
 struct s_control_msg {
   uint8_t start_magic;   // '<'
   uint8_t state[2];      // two byte hex encoded state
@@ -39,6 +42,8 @@ volatile bool sendDistance;
 
 void setup() {
   // Pins
+  pinMode(leftPinOut, OUTPUT);    //left blinker
+  pinMode(rightPinOut, OUTPUT);     //right blinker
   pinMode(BT_CD, INPUT);
   pinMode(13, OUTPUT);   // Use the built-in led for BT-carrier detect light
   Serial.begin(115200);  // USB serial
@@ -71,8 +76,65 @@ void setup() {
 void requestDistanceTX() {
  sendDistance = true; 
 }
+//leftBlinker = 1, rightBlinker = -1, neighter = 0;
+int configBlinker(void) {
+  uint8_t left_speed, right_speed, state;
+  int left_direction, right_direction, left_val, right_val;
+  state = hexToDec(msg.state);
+  if (state & B00000001) {
+    left_direction = -1;
+  } else {
+    left_direction = 1;
+  }
+  if (state & B00000010) {
+    right_direction = -1;
+  } else {
+    right_direction = 1;
+  }
+  left_speed = hexToDec(msg.left_motor);
+  right_speed = hexToDec(msg.right_motor);
+  left_val = left_speed * left_direction;
+  right_val = right_speed * right_direction;
+
+  /*
+  Serial.println("Speed:");
+  Serial.println(left_val);
+  Serial.println(right_val);
+  Serial.println("--------");
+  */
+
+  if(left_val > 50 && right_val > 50) {
+    return 0;
+  } else if(left_val > 50 && right_val < 50) {  //vasen vie, käännytään oikealle
+    return -1;
+  } else if(left_val < 50 && right_val > 50) {  //oikea vie, käännytään vasemmalle
+    return 1;
+  } else {
+    return 0;
+  }
+
+}
 
 void loop() {
+
+  //Määritä vilkut
+  int res = configBlinker();
+  if(res > 0) {
+    digitalWrite(leftPinOut, HIGH);
+    digitalWrite(rightPinOut, LOW);
+    Serial.println(res);
+  } else if(res < 0) {
+    digitalWrite(rightPinOut, HIGH);
+    digitalWrite(leftPinOut, LOW);
+    Serial.println(res);
+  } else {
+    digitalWrite(rightPinOut, LOW);
+    digitalWrite(leftPinOut, LOW);
+    Serial.println(res);
+  }
+
+  
+  
   if (digitalRead(6)==HIGH) {
     digitalWrite(13,HIGH);
     // Lähetä esteestä tieto
@@ -87,6 +149,7 @@ void loop() {
   } else {
     digitalWrite(13, LOW);
   }
+
   receive_msg();  
 }
 
