@@ -58,10 +58,14 @@ void loop()
   //Määritä vilkkujen totuusarvot
   if(digitalRead(inputLeftBlinker) == HIGH) {
     vasenVilkku = true;
+  } else {
+    vasenVilkku = false;
   }
 
   if(digitalRead(inputRightBlinker == HIGH)) {
     oikeaVilkku = true;
+  } else {
+    oikeaVilkku = false;
   }
 
   //Käytä vilkkuja
